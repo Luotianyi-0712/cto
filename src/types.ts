@@ -60,5 +60,7 @@ export interface SystemStats {
   cpuUsage: string;
   memoryUsage: string;
   activeCookies: number;
+  totalConversations?: number;  // 总会话数
+  activeConversations?: number; // 活跃会话数
 }
 

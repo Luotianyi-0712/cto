@@ -12,6 +12,7 @@ import {
 } from "../services/chat.ts";
 import { recordRequest, getAvailableCookie, recordCookieUsage } from "../services/cookie.ts";
 import { logger } from "../services/logger.ts";
+import { findExistingConversation, registerConversation } from "../services/conversation.ts";
 
 export const apiRouter = new Router();
 
@@ -86,24 +87,17 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
     return;
   }
 
-  // 将多轮对话转换为单轮对话
-  const conversationParts: string[] = [];
-  for (const msg of messages) {
-    const role = msg.role || "unknown";
-    const content = msg.content || "";
-    if (content) {
-      conversationParts.push(`${role}:\n${content}\n\n`);
-    }
-  }
-
-  const fullPrompt = conversationParts.join("\n\n");
-  logger.info(`API 调用 - Prompt 长度: ${fullPrompt.length} 字符`);
-
-  if (!fullPrompt.trim()) {
+  // 获取最后一条用户消息（会话保持模式下，只需要发送当前问题）
+  const lastUserMessage = [...messages].reverse().find(msg => msg.role === "user");
+  
+  if (!lastUserMessage || !lastUserMessage.content) {
     ctx.response.status = 400;
-    ctx.response.body = { error: "整合后的消息内容为空" };
+    ctx.response.body = { error: "未找到有效的用户消息" };
     return;
   }
+
+  const prompt = lastUserMessage.content;
+  logger.info(`API 调用 - 用户问题: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`);
 
   // 获取 JWT token
   let jwtToken: string;
@@ -127,9 +121,15 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
     return;
   }
 
-  // 生成新的聊天历史 ID
-  const chatHistoryId = crypto.randomUUID();
-  logger.info(`API 调用 - 新对话: ${chatHistoryId.slice(0, 8)}... | Model: ${model}`);
+  // 查找已有会话（会话保持）
+  const existingChatHistoryId = await findExistingConversation(messages, model);
+  const chatHistoryId = existingChatHistoryId || crypto.randomUUID();
+  
+  if (existingChatHistoryId) {
+    logger.info(`API 调用 - 复用会话: ${chatHistoryId} | Model: ${model}`);
+  } else {
+    logger.info(`API 调用 - 新对话: ${chatHistoryId} | Model: ${model}`);
+  }
 
   const requestId = `chatcmpl-${crypto.randomUUID()}`;
 
@@ -149,16 +149,48 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
     ctx.response.headers.set("Connection", "keep-alive");
     ctx.response.headers.set("X-Accel-Buffering", "no");
 
-    const body = streamChatGenerator(
+    // 包装生成器以追踪完整内容（用于会话注册）
+    const originalGenerator = streamChatGenerator(
       requestId,
       model,
       chatHistoryId,
       userId,
       jwtToken,
-      fullPrompt,
+      prompt,
     );
 
-    ctx.response.body = body;
+    const wrappedGenerator = (async function* () {
+      let assembledContent = "";
+      const decoder = new TextDecoder();
+
+      try {
+        for await (const chunk of originalGenerator) {
+          // 尝试提取内容（SSE 格式解析）
+          const text = decoder.decode(chunk, { stream: true });
+          const match = text.match(/"content":"([^"]*)"/);
+          if (match && match[1]) {
+            assembledContent += match[1].replace(/\\n/g, "\n");
+          }
+          yield chunk;
+        }
+
+        // 流式响应结束后，注册会话（后台异步执行）
+        if (assembledContent.trim()) {
+          const messagesWithAssistant = [
+            ...messages,
+            { role: "assistant", content: assembledContent.trim() },
+          ];
+          registerConversation(messagesWithAssistant, model, chatHistoryId).catch((e) => {
+            logger.error(`会话注册失败: ${e}`);
+          });
+        }
+      } catch (error) {
+        logger.error(`流式生成器错误: ${error}`);
+        throw error;
+      }
+    })();
+
+    ctx.response.body = wrappedGenerator;
   } else {
     // 非流式响应
     try {
@@ -168,7 +200,7 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
         chatHistoryId,
         userId,
         jwtToken,
-        fullPrompt,
+        prompt,
       );
       ctx.response.body = createCompletionResponse(
         requestId,
@@ -179,6 +211,16 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
       // 记录 Cookie 使用
       if (usedCookieId) {
         await recordCookieUsage(usedCookieId);
+      }
+
+      // 注册会话（会话保持）
+      if (fullContent.trim()) {
+        const messagesWithAssistant = [
+          ...messages,
+          { role: "assistant", content: fullContent.trim() },
+        ];
+        await registerConversation(messagesWithAssistant, model, chatHistoryId);
+        logger.info(`会话已注册: ${chatHistoryId}`);
       }
     } catch (e) {
       await recordRequest(false);

@@ -14,6 +14,8 @@ import {
 } from "../services/cookie.ts";
 import { adminAuthMiddleware } from "../middleware/auth.ts";
 import { getRecentLogs, subscribeToLogs, logger, type LogEntry } from "../services/logger.ts";
+import { getConversationStats, getAllConversations, deleteConversation } from "../services/conversation.ts";
+import { getJwtFromCookie } from "../services/auth.ts";
 
 export const adminRouter = new Router();
 
@@ -119,7 +121,14 @@ adminRouter.use("/admin/api", adminAuthMiddleware);
  * 获取系统统计
  */
 adminRouter.get("/admin/api/stats", async (ctx) => {
-  ctx.response.body = await getSystemStats();
+  const stats = await getSystemStats();
+  const conversationStats = await getConversationStats();
+  
+  ctx.response.body = {
+    ...stats,
+    totalConversations: conversationStats.total,
+    activeConversations: conversationStats.active,
+  };
 });
 
 /**
@@ -244,4 +253,49 @@ adminRouter.post("/admin/api/verify-key", (ctx) => {
   // 鉴权中间件会处理实际的密钥验证
   // 如果能到达这里，说明密钥是有效的
   ctx.response.body = { valid: true, message: "密钥有效" };
+});
+
+/**
+ * 获取所有会话列表
+ */
+adminRouter.get("/admin/api/conversations", async (ctx) => {
+  ctx.response.body = await getAllConversations();
+});
+
+/**
+ * 删除指定会话
+ */
+adminRouter.delete("/admin/api/conversations/:id", async (ctx) => {
+  const chatHistoryId = ctx.params.id;
+  
+  // 从 Cookie 池获取任意一个 Cookie 来获取 JWT
+  const cookies = await getAllCookies();
+  const activeCookie = cookies.find((c) => c.status === "active");
+  
+  if (!activeCookie) {
+    ctx.response.status = 503;
+    ctx.response.body = { 
+      error: "无可用 Cookie",
+      message: "需要至少一个有效的 Cookie 来清理 cto.new 的对话记录" 
+    };
+    return;
+  }
+  
+  try {
+    const jwtToken = await getJwtFromCookie(activeCookie.cookie);
+    const result = await deleteConversation(chatHistoryId, jwtToken);
+    
+    if (result.success) {
+      logger.info(`🗑️ 删除会话: ${chatHistoryId}`);
+      ctx.response.body = { success: true, message: "会话已删除" };
+    } else {
+      logger.error(`删除会话失败: ${result.error}`);
+      ctx.response.status = 500;
+      ctx.response.body = { error: result.error };
+    }
+  } catch (e) {
+    logger.error(`删除会话异常: ${e}`);
+    ctx.response.status = 500;
+    ctx.response.body = { error: `删除失败: ${e}` };
+  }
 });

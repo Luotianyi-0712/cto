@@ -550,20 +550,21 @@
             <div class="stat-icon">✅</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">CPU使用率</div>
-            <div class="stat-value" id="cpuUsage">0%</div>
-            <div class="stat-icon">💻</div>
+            <div class="stat-label">总会话数</div>
+            <div class="stat-value" id="totalConversations">0</div>
+            <div class="stat-icon">💬</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">内存使用</div>
-            <div class="stat-value" id="memoryUsage">0%</div>
-            <div class="stat-icon">🧠</div>
+            <div class="stat-label">活跃会话</div>
+            <div class="stat-value" id="activeConversations">0</div>
+            <div class="stat-icon">🗨️</div>
         </div>
     </div>
 
     <div class="tabs">
         <div class="tab-buttons">
             <button class="tab-button active" onclick="switchTab('cookies')">🍪 Cookie管理</button>
+            <button class="tab-button" onclick="switchTab('conversations')">💬 会话管理</button>
             <button class="tab-button" onclick="switchTab('schedule')">📅 实时日志</button>
             <button class="tab-button" onclick="switchTab('config')">⚙️ 系统配置</button>
             <button class="tab-button" onclick="switchTab('monitor')">📈 系统监控</button>
@@ -589,6 +590,15 @@
 
                 <div id="cookieList" class="cookie-list">
                     <!-- Cookie 列表将动态加载 -->
+                </div>
+            </div>
+
+            <!-- 会话管理 -->
+            <div id="tab-conversations" class="tab-pane">
+                <div class="config-section">
+                    <h3>💬 会话管理</h3>
+                    <button class="btn btn-primary" onclick="loadConversations()" style="margin-bottom: 20px;">🔄 刷新</button>
+                    <div id="conversationsList"></div>
                 </div>
             </div>
 
@@ -748,8 +758,8 @@
                 
                 document.getElementById('totalRequests').textContent = stats.totalRequests;
                 document.getElementById('successRequests').textContent = stats.successRequests;
-                document.getElementById('cpuUsage').textContent = stats.cpuUsage;
-                document.getElementById('memoryUsage').textContent = stats.memoryUsage;
+                document.getElementById('totalConversations').textContent = stats.totalConversations || 0;
+                document.getElementById('activeConversations').textContent = stats.activeConversations || 0;
                 
                 document.getElementById('monitorTotalRequests').textContent = stats.totalRequests;
                 document.getElementById('monitorSuccessRequests').textContent = stats.successRequests;
@@ -1067,6 +1077,66 @@
                 eventSourceInstance.close();
             }
         });
+
+        // ========== 会话管理 ==========
+        async function loadConversations() {
+            try {
+                const response = await fetchWithAuth('/admin/api/conversations');
+                const conversations = await response.json();
+                
+                const container = document.getElementById('conversationsList');
+                
+                if (conversations.length === 0) {
+                    container.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">暂无会话记录</div>';
+                    return;
+                }
+                
+                let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f5f5f5;"><th style="padding: 12px; text-align: left;">会话 ID</th><th style="padding: 12px; text-align: left;">模型</th><th style="padding: 12px; text-align: left;">最后更新</th><th style="padding: 12px; text-align: center;">操作</th></tr></thead><tbody>';
+                
+                conversations.forEach(conv => {
+                    const date = new Date(conv.lastUpdated);
+                    const timeStr = date.toLocaleString('zh-CN');
+                    html += `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px; font-family: monospace; font-size: 13px;">${conv.chatHistoryId}</td>
+                            <td style="padding: 12px;">${conv.model}</td>
+                            <td style="padding: 12px;">${timeStr}</td>
+                            <td style="padding: 12px; text-align: center;">
+                                <button class="btn" style="background: #ef4444; padding: 6px 12px; font-size: 12px;" onclick="deleteConversation('${conv.chatHistoryId}')">🗑️ 删除</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            } catch (error) {
+                alert('❌ 加载会话失败: ' + error.message);
+            }
+        }
+        
+        async function deleteConversation(chatHistoryId) {
+            if (!confirm(`确定要删除会话 ${chatHistoryId} 吗？\n\n这将同时删除 cto.new 网站上的对话记录！`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetchWithAuth(`/admin/api/conversations/${chatHistoryId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('✅ 会话已删除！');
+                    loadConversations();
+                    loadStats();
+                } else {
+                    const error = await response.json();
+                    alert(`❌ 删除失败: ${error.error || error.message}`);
+                }
+            } catch (error) {
+                alert('❌ 删除失败: ' + error.message);
+            }
+        }
 
         // 启动日志连接
         connectLogs();
