@@ -74,7 +74,11 @@ export async function deleteCookie(id: string): Promise<boolean> {
 /**
  * 测试 Cookie 是否有效
  */
-export async function testCookie(cookie: string): Promise<boolean> {
+export async function testCookie(cookie: string): Promise<{
+  valid: boolean;
+  error?: string;
+  sessionId?: string;
+}> {
   try {
     const resp = await fetch("https://clerk.cto.new/v1/client", {
       headers: {
@@ -82,9 +86,33 @@ export async function testCookie(cookie: string): Promise<boolean> {
         Origin: "https://cto.new",
       },
     });
-    return resp.ok;
-  } catch {
-    return false;
+    
+    if (!resp.ok) {
+      return { 
+        valid: false, 
+        error: `HTTP ${resp.status}: ${resp.statusText}` 
+      };
+    }
+
+    const data = await resp.json();
+    const sessions = data?.response?.sessions || [];
+    
+    if (sessions.length === 0) {
+      return { 
+        valid: false, 
+        error: "Cookie 中没有有效的 session（可能已过期）" 
+      };
+    }
+
+    return { 
+      valid: true, 
+      sessionId: sessions[0].id 
+    };
+  } catch (e) {
+    return { 
+      valid: false, 
+      error: `网络错误: ${e}` 
+    };
   }
 }
 

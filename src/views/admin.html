@@ -749,9 +749,9 @@
                 const result = await response.json();
                 
                 if (result.valid) {
-                    alert('✅ Cookie 有效！');
+                    alert(`✅ Cookie 有效！\n\nSession ID: ${result.sessionId || 'N/A'}`);
                 } else {
-                    alert('❌ Cookie 已失效，请更新');
+                    alert(`❌ Cookie 已失效\n\n错误信息：${result.error || '未知错误'}\n\n请到 cto.new 重新登录并获取新的 Cookie`);
                 }
             } catch (error) {
                 alert('❌ 测试失败: ' + error.message);
@@ -818,55 +818,85 @@
         }, 5000);
 
         // 连接实时日志 SSE
+        let eventSourceInstance = null;
         function connectLogs() {
             const logContainer = document.getElementById('logContainer');
-            // 通过 URL 参数传递密钥
-            const eventSource = new EventSource(`/admin/api/logs/stream?token=${encodeURIComponent(adminKey)}`);
+            
+            // 显示连接状态
+            logContainer.innerHTML = '<div style="color: #f59e0b;">正在连接日志服务器...</div>';
+            
+            // EventSource 不支持自定义 header，通过 URL 参数传递密钥
+            const url = `/admin/api/logs/stream?token=${encodeURIComponent(adminKey)}`;
+            console.log('连接日志 SSE:', url);
+            
+            try {
+                eventSourceInstance = new EventSource(url);
 
-            eventSource.onopen = () => {
-                console.log('日志连接已建立');
-                logContainer.innerHTML = '';
-            };
+                eventSourceInstance.onopen = () => {
+                    console.log('✅ 日志连接已建立');
+                    logContainer.innerHTML = '<div style="color: #10b981;">✅ 日志连接成功，等待日志...</div>';
+                };
 
-            eventSource.onmessage = (event) => {
-                try {
-                    const log = JSON.parse(event.data);
-                    const logLine = document.createElement('div');
-                    logLine.style.marginBottom = '4px';
+                eventSourceInstance.onmessage = (event) => {
+                    try {
+                        // 清除初始提示
+                        if (logContainer.children.length === 1 && logContainer.firstChild.textContent.includes('等待日志')) {
+                            logContainer.innerHTML = '';
+                        }
+                        
+                        const log = JSON.parse(event.data);
+                        const logLine = document.createElement('div');
+                        logLine.style.marginBottom = '4px';
+                        
+                        // 根据日志级别设置颜色
+                        let color = '#e5e7eb'; // 默认灰白色
+                        if (log.level === 'ERROR') {
+                            color = '#ef4444'; // 红色
+                        } else if (log.level === 'WARN') {
+                            color = '#f59e0b'; // 橙色
+                        } else if (log.level === 'INFO') {
+                            color = '#10b981'; // 绿色
+                        }
+                        
+                        logLine.innerHTML = `<span style="color: #9ca3af;">${log.timestamp}</span> <span style="color: ${color}; font-weight: bold;">[${log.level}]</span> ${log.message}`;
+                        logContainer.appendChild(logLine);
+                        
+                        // 自动滚动到底部
+                        logContainer.scrollTop = logContainer.scrollHeight;
+                        
+                        // 限制日志条数（最多显示 200 条）
+                        while (logContainer.children.length > 200) {
+                            logContainer.removeChild(logContainer.firstChild);
+                        }
+                    } catch (e) {
+                        console.error('解析日志失败:', e, event.data);
+                    }
+                };
+
+                eventSourceInstance.onerror = (error) => {
+                    console.error('❌ 日志连接错误:', error);
+                    logContainer.innerHTML = '<div style="color: #ef4444;">❌ 日志连接失败，5秒后重试...</div>';
                     
-                    // 根据日志级别设置颜色
-                    let color = '#e5e7eb'; // 默认灰白色
-                    if (log.level === 'ERROR') {
-                        color = '#ef4444'; // 红色
-                    } else if (log.level === 'WARN') {
-                        color = '#f59e0b'; // 橙色
-                    } else if (log.level === 'INFO') {
-                        color = '#10b981'; // 绿色
+                    if (eventSourceInstance) {
+                        eventSourceInstance.close();
+                        eventSourceInstance = null;
                     }
                     
-                    logLine.innerHTML = `<span style="color: #9ca3af;">${log.timestamp}</span> <span style="color: ${color}; font-weight: bold;">[${log.level}]</span> ${log.message}`;
-                    logContainer.appendChild(logLine);
-                    
-                    // 自动滚动到底部
-                    logContainer.scrollTop = logContainer.scrollHeight;
-                    
-                    // 限制日志条数（最多显示 200 条）
-                    while (logContainer.children.length > 200) {
-                        logContainer.removeChild(logContainer.firstChild);
-                    }
-                } catch (e) {
-                    console.error('解析日志失败:', e);
-                }
-            };
-
-            eventSource.onerror = (error) => {
-                console.error('日志连接错误:', error);
-                eventSource.close();
-                
-                // 5 秒后重连
-                setTimeout(connectLogs, 5000);
-            };
+                    // 5 秒后重连
+                    setTimeout(connectLogs, 5000);
+                };
+            } catch (e) {
+                console.error('创建 EventSource 失败:', e);
+                logContainer.innerHTML = `<div style="color: #ef4444;">❌ 创建连接失败: ${e.message}</div>`;
+            }
         }
+
+        // 页面关闭时断开连接
+        window.addEventListener('beforeunload', () => {
+            if (eventSourceInstance) {
+                eventSourceInstance.close();
+            }
+        });
 
         // 启动日志连接
         connectLogs();
