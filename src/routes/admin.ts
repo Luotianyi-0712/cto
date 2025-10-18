@@ -17,6 +17,23 @@ import { getRecentLogs, subscribeToLogs, type LogEntry } from "../services/logge
 
 export const adminRouter = new Router();
 
+adminRouter.get("/favicon.ico", async (ctx) => {
+  try {
+    const response = await fetch("https://cto.new/favicon.ico");
+    if (response.ok) {
+      const iconData = await response.arrayBuffer();
+      ctx.response.headers.set("Content-Type", "image/x-icon");
+      ctx.response.headers.set("Cache-Control", "public, max-age=86400"); // 缓存1天
+      ctx.response.body = iconData;
+    } else {
+      ctx.response.status = 404;
+    }
+  } catch (e) {
+    console.error("获取 favicon 失败:", e);
+    ctx.response.status = 500;
+  }
+});
+
 /**
  * 管理后台登录页面
  */
