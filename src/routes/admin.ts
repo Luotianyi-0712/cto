@@ -12,8 +12,26 @@ import {
   testCookie,
   getSystemStats,
 } from "../services/cookie.ts";
+import { adminAuthMiddleware } from "../middleware/auth.ts";
 
 export const adminRouter = new Router();
+
+// 应用鉴权中间件到所有管理后台路由
+adminRouter.use("/admin", adminAuthMiddleware);
+
+/**
+ * 管理后台登录页面
+ */
+adminRouter.get("/admin/login", async (ctx) => {
+  try {
+    const html = await Deno.readTextFile("./src/views/login.html");
+    ctx.response.headers.set("Content-Type", "text/html; charset=utf-8");
+    ctx.response.body = html;
+  } catch (e) {
+    ctx.response.status = 500;
+    ctx.response.body = { error: `无法加载登录页面: ${e}` };
+  }
+});
 
 /**
  * 管理后台首页

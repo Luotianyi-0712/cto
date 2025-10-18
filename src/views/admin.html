@@ -457,6 +457,7 @@
                 服务运行中
             </div>
             <button class="test-button" onclick="testChatAPI()">💬 聊天测试</button>
+            <button class="test-button" onclick="logout()" style="background: #999;">🚪 退出</button>
         </div>
     </div>
 
@@ -596,6 +597,40 @@
     </div>
 
     <script>
+        // 检查登录状态
+        const adminKey = localStorage.getItem('adminKey');
+        if (!adminKey) {
+            window.location.href = '/admin/login';
+        }
+
+        // 全局请求配置
+        const fetchWithAuth = (url, options = {}) => {
+            return fetch(url, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${adminKey}`
+                }
+            }).then(async response => {
+                if (response.status === 401) {
+                    // 认证失败，清除密钥并跳转到登录页
+                    localStorage.removeItem('adminKey');
+                    alert('认证失败，请重新登录');
+                    window.location.href = '/admin/login';
+                    throw new Error('Unauthorized');
+                }
+                return response;
+            });
+        };
+
+        // 退出登录
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                localStorage.removeItem('adminKey');
+                window.location.href = '/admin/login';
+            }
+        }
+
         // 切换标签页
         function switchTab(tabName) {
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
@@ -608,7 +643,7 @@
         // 加载统计数据
         async function loadStats() {
             try {
-                const response = await fetch('/admin/api/stats');
+                const response = await fetchWithAuth('/admin/api/stats');
                 const stats = await response.json();
                 
                 document.getElementById('totalRequests').textContent = stats.totalRequests;
@@ -632,7 +667,7 @@
         // 加载 Cookie 列表
         async function loadCookies() {
             try {
-                const response = await fetch('/admin/api/cookies');
+                const response = await fetchWithAuth('/admin/api/cookies');
                 const cookies = await response.json();
                 
                 const container = document.getElementById('cookieList');
@@ -686,7 +721,7 @@
             const cookie = document.getElementById('cookieValue').value;
             
             try {
-                const response = await fetch('/admin/api/cookies', {
+                const response = await fetchWithAuth('/admin/api/cookies', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, cookie })
@@ -709,7 +744,7 @@
         // 测试 Cookie
         async function testCookie(id) {
             try {
-                const response = await fetch(`/admin/api/cookies/${id}/test`, {
+                const response = await fetchWithAuth(`/admin/api/cookies/${id}/test`, {
                     method: 'POST'
                 });
                 const result = await response.json();
@@ -729,7 +764,7 @@
             const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
             
             try {
-                const response = await fetch(`/admin/api/cookies/${id}`, {
+                const response = await fetchWithAuth(`/admin/api/cookies/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: newStatus })
@@ -749,7 +784,7 @@
             if (!confirm('确定要删除这个 Cookie 吗？')) return;
             
             try {
-                const response = await fetch(`/admin/api/cookies/${id}`, {
+                const response = await fetchWithAuth(`/admin/api/cookies/${id}`, {
                     method: 'DELETE'
                 });
                 

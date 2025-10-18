@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - CTO.new 管理后台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 8px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .logo p {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d0d0d0;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #666;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-login:hover {
+            background: #555;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .help-text {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .help-text code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .help-text strong {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>🔐 管理后台登录</h1>
+            <p>CTO.new API 转换器</p>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="adminKey">管理密钥</label>
+                <input 
+                    type="password" 
+                    id="adminKey" 
+                    placeholder="请输入 ADMIN_KEY" 
+                    required
+                    autocomplete="off"
+                >
+            </div>
+
+            <button type="submit" class="btn-login">登录</button>
+        </form>
+
+        <div class="help-text">
+            <strong>💡 提示：</strong><br>
+            • 管理密钥通过环境变量 <code>ADMIN_KEY</code> 设置<br>
+            • 默认密钥为 <code>your-secret-key-change-me</code><br>
+            • 生产环境请务必修改默认密钥<br>
+            • 密钥会保存在浏览器本地，下次自动登录
+        </div>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const adminKeyInput = document.getElementById('adminKey');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // 检查是否已有保存的密钥
+        const savedKey = localStorage.getItem('adminKey');
+        if (savedKey) {
+            // 自动验证并跳转
+            verifyAndRedirect(savedKey);
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const adminKey = adminKeyInput.value.trim();
+            if (!adminKey) {
+                showError('请输入管理密钥');
+                return;
+            }
+
+            await verifyAndRedirect(adminKey);
+        });
+
+        async function verifyAndRedirect(adminKey) {
+            try {
+                // 验证密钥
+                const response = await fetch('/admin/api/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${adminKey}`
+                    }
+                });
+
+                if (response.ok) {
+                    // 保存密钥到本地
+                    localStorage.setItem('adminKey', adminKey);
+                    // 跳转到管理后台
+                    window.location.href = '/admin';
+                } else if (response.status === 401) {
+                    showError('密钥错误，请重试');
+                    localStorage.removeItem('adminKey');
+                } else {
+                    showError('验证失败，请稍后重试');
+                }
+            } catch (error) {
+                showError('网络错误: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
+

@@ -170,8 +170,8 @@ apiRouter.get("/v1/models", (ctx) => {
 apiRouter.get("/", (ctx) => {
   ctx.response.body = {
     status: "ok",
-    service: "enginelabs-2api-v3",
-    version: "3.1.0",
+    service: "CTO-2api-v1",
+    version: "1.1.0",
   };
 });
 
