@@ -18,16 +18,30 @@ export const apiRouter = new Router();
  * 聊天接口
  */
 apiRouter.post("/v1/chat/completions", async (ctx) => {
-  // 检查 Authorization header（可选）
+  // 验证 Authorization
   const authorization = ctx.request.headers.get("authorization");
-  let clerkCookie: string | null = null;
+  if (!authorization || !authorization.startsWith("Bearer ")) {
+    ctx.response.status = 401;
+    ctx.response.body = { 
+      error: "Unauthorized",
+      message: "需要提供 Authorization: Bearer <API_KEY 或 Cookie>" 
+    };
+    return;
+  }
+
+  const providedValue = authorization.slice(7).replace(/\.\.\.\.\./g, "; ");
+  const ADMIN_KEY = Deno.env.get("ADMIN_KEY") || "your-secret-key-change-me";
+  
+  let clerkCookie: string;
   let usedCookieId: string | null = null;
   
-  // 如果提供了 Authorization，优先使用
-  if (authorization && authorization.startsWith("Bearer ")) {
-    clerkCookie = authorization.slice(7).replace(/\.\.\.\.\./g, "; ");
-  } else {
-    // 否则从 Cookie 池中获取可用的 Cookie
+  // 判断传入的是 Cookie 还是 API Key
+  if (providedValue.includes("__client") || providedValue.includes("__session")) {
+    // 传入的是 Cookie，直接使用
+    clerkCookie = providedValue;
+    console.log("使用用户直接提供的 Cookie");
+  } else if (providedValue === ADMIN_KEY) {
+    // 传入的是 API Key，从 Cookie 池中获取
     const availableCookie = await getAvailableCookie();
     if (!availableCookie) {
       ctx.response.status = 503;
@@ -39,7 +53,15 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
     }
     clerkCookie = availableCookie.cookie;
     usedCookieId = availableCookie.id;
-    console.log(`使用 Cookie 池中的 Cookie: ${availableCookie.name} (ID: ${availableCookie.id})`);
+    console.log(`API Key 验证通过，使用 Cookie 池中的 Cookie: ${availableCookie.name} (ID: ${availableCookie.id})`);
+  } else {
+    // 既不是 Cookie 也不是有效的 API Key
+    ctx.response.status = 401;
+    ctx.response.body = { 
+      error: "Unauthorized",
+      message: "无效的 API Key 或 Cookie" 
+    };
+    return;
   }
 
   // 解析请求
