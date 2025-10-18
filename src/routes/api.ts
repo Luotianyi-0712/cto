@@ -14,6 +14,26 @@ import { recordRequest, getAvailableCookie, recordCookieUsage } from "../service
 import { logger } from "../services/logger.ts";
 import { findExistingConversation, registerConversation } from "../services/conversation.ts";
 
+/**
+ * 提取消息内容（处理字符串或数组格式）
+ * OpenAI API 支持 content 为字符串或多模态数组
+ */
+function extractMessageContent(content: string | Array<{ type: string; text?: string; image_url?: unknown }>): string {
+  if (typeof content === "string") {
+    return content;
+  }
+  
+  if (Array.isArray(content)) {
+    // 提取所有 text 类型的内容
+    return content
+      .filter(item => item.type === "text" && item.text)
+      .map(item => item.text)
+      .join("\n");
+  }
+  
+  return "";
+}
+
 export const apiRouter = new Router();
 
 /**
@@ -124,15 +144,20 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
       ctx.response.body = { error: "未找到有效的用户消息" };
       return;
     }
-    prompt = lastUserMessage.content;
+    prompt = extractMessageContent(lastUserMessage.content);
+    if (!prompt.trim()) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "消息内容为空" };
+      return;
+    }
     logger.info(`API 调用 - 复用会话: ${chatHistoryId} | Model: ${model} | 问题: ${prompt.substring(0, 50)}...`);
   } else {
     // 新会话：合并所有消息（第一次对话，需要完整上下文）
     const conversationParts: string[] = [];
     for (const msg of messages) {
       const role = msg.role || "unknown";
-      const content = msg.content || "";
-      if (content) {
+      const content = extractMessageContent(msg.content || "");
+      if (content.trim()) {
         conversationParts.push(`${role}:\n${content}\n`);
       }
     }

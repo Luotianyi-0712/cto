@@ -2,9 +2,19 @@
  * TypeScript 类型定义
  */
 
+// 多模态内容项（OpenAI API 规范）
+export interface ContentItem {
+  type: "text" | "image_url";
+  text?: string;
+  image_url?: {
+    url: string;
+    detail?: "auto" | "low" | "high";
+  };
+}
+
 export interface ChatMessage {
   role: string;
-  content: string;
+  content: string | ContentItem[]; // 支持字符串或多模态数组
 }
 
 export interface ChatRequest {

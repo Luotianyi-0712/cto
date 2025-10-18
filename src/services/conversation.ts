@@ -18,15 +18,35 @@ const kv = await Deno.openKv();
 const CONVERSATION_TTL_MS = 1000 * 60 * 60;
 
 /**
+ * 提取消息内容（处理字符串或数组格式）
+ */
+function extractMessageContent(content: string | Array<{ type: string; text?: string; image_url?: unknown }>): string {
+  if (typeof content === "string") {
+    return content;
+  }
+  
+  if (Array.isArray(content)) {
+    // 提取所有 text 类型的内容
+    return content
+      .filter(item => item.type === "text" && item.text)
+      .map(item => item.text)
+      .join("\n");
+  }
+  
+  return "";
+}
+
+/**
  * 标准化消息（只保留 role 和 content）
  */
 function normalizeMessages(messages: ChatMessage[]): Array<{ role: string; content: string }> {
   return messages
-    .filter((msg) => typeof msg?.role === "string" && typeof msg?.content === "string")
+    .filter((msg) => msg?.role && msg?.content)
     .map((msg) => ({
       role: msg.role,
-      content: msg.content,
-    }));
+      content: extractMessageContent(msg.content),
+    }))
+    .filter((msg) => msg.content.trim()); // 过滤空内容
 }
 
 /**
