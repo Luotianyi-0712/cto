@@ -444,6 +444,83 @@
             color: #333;
             font-weight: 600;
         }
+
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .modal-body .form-group {
+            margin-bottom: 20px;
+        }
+
+        .modal-body label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .modal-body input,
+        .modal-body textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d0d0d0;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .modal-body textarea {
+            min-height: 100px;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-footer .btn {
+            padding: 10px 20px;
+        }
     </style>
 </head>
 <body>
@@ -591,6 +668,30 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑 Cookie 模态框 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ 编辑 Cookie</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="editCookieName">Cookie 名称</label>
+                    <input type="text" id="editCookieName" placeholder="例如: 主账号">
+                </div>
+                <div class="form-group">
+                    <label for="editCookieValue">Cookie 值</label>
+                    <textarea id="editCookieValue" placeholder="粘贴完整的 Cookie 字符串..."></textarea>
+                    <small style="color: #999; font-size: 12px;">💡 留空表示不修改 Cookie 值</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" style="background: #999;" onclick="closeEditModal()">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditCookie()">保存</button>
             </div>
         </div>
     </div>
@@ -797,10 +898,79 @@
             }
         }
 
+        // 当前编辑的 Cookie ID
+        let currentEditCookieId = null;
+
         // 编辑 Cookie
-        function editCookie(id) {
-            alert('编辑功能开发中...');
+        async function editCookie(id) {
+            try {
+                // 获取现有 Cookie 数据
+                const response = await fetchWithAuth(`/admin/api/cookies/${id}`);
+                const cookie = await response.json();
+                
+                // 填充表单
+                document.getElementById('editCookieName').value = cookie.name;
+                document.getElementById('editCookieValue').value = '';
+                currentEditCookieId = id;
+                
+                // 显示模态框
+                document.getElementById('editModal').classList.add('show');
+            } catch (error) {
+                alert('❌ 获取 Cookie 信息失败: ' + error.message);
+            }
         }
+
+        // 关闭编辑模态框
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('show');
+            currentEditCookieId = null;
+        }
+
+        // 保存编辑
+        async function saveEditCookie() {
+            if (!currentEditCookieId) return;
+            
+            const newName = document.getElementById('editCookieName').value.trim();
+            const newCookieValue = document.getElementById('editCookieValue').value.trim();
+            
+            if (!newName) {
+                alert('❌ Cookie 名称不能为空');
+                return;
+            }
+            
+            try {
+                // 构建更新数据
+                const updateData = { name: newName };
+                if (newCookieValue) {
+                    updateData.cookie = newCookieValue;
+                }
+                
+                // 发送更新请求
+                const response = await fetchWithAuth(`/admin/api/cookies/${currentEditCookieId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updateData)
+                });
+                
+                if (response.ok) {
+                    alert('✅ 更新成功！');
+                    closeEditModal();
+                    loadCookies();
+                } else {
+                    const error = await response.json();
+                    alert(`❌ 更新失败: ${error.error || '未知错误'}`);
+                }
+            } catch (error) {
+                alert('❌ 保存失败: ' + error.message);
+            }
+        }
+
+        // 点击模态框背景关闭
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeEditModal();
+            }
+        });
 
         // 测试聊天 API
         function testChatAPI() {
@@ -903,4 +1073,5 @@
     </script>
 </body>
 </html>
+
 
