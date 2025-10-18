@@ -7,9 +7,23 @@ import type { CookieData, SystemStats } from "../types.ts";
 // 使用 Deno KV 持久化存储
 const kv = await Deno.openKv();
 
-// 统计数据
-let totalRequests = 0;
-let successRequests = 0;
+// 统计数据的 KV 键
+const STATS_KEY = ["stats", "requests"];
+
+/**
+ * 获取统计数据（从 KV）
+ */
+async function getStats(): Promise<{ total: number; success: number }> {
+  const result = await kv.get<{ total: number; success: number }>(STATS_KEY);
+  return result.value || { total: 0, success: 0 };
+}
+
+/**
+ * 更新统计数据（到 KV）
+ */
+async function updateStats(total: number, success: number): Promise<void> {
+  await kv.set(STATS_KEY, { total, success });
+}
 
 /**
  * 获取所有 Cookie
@@ -142,23 +156,26 @@ export async function recordCookieUsage(id: string): Promise<void> {
 }
 
 /**
- * 记录请求统计
+ * 记录请求统计（持久化到 KV）
  */
-export function recordRequest(success: boolean): void {
-  totalRequests++;
-  if (success) successRequests++;
+export async function recordRequest(success: boolean): Promise<void> {
+  const stats = await getStats();
+  stats.total++;
+  if (success) stats.success++;
+  await updateStats(stats.total, stats.success);
 }
 
 /**
- * 获取系统统计
+ * 获取系统统计（从 KV 读取）
  */
 export async function getSystemStats(): Promise<SystemStats> {
   const allCookies = await getAllCookies();
   const activeCookies = allCookies.filter((c) => c.status === "active").length;
+  const stats = await getStats();
 
   return {
-    totalRequests,
-    successRequests,
+    totalRequests: stats.total,
+    successRequests: stats.success,
     cpuUsage: "0%", // Deno Deploy 不提供 CPU 信息
     memoryUsage: "0%", // Deno Deploy 不提供内存信息
     activeCookies,

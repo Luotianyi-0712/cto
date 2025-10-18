@@ -75,7 +75,7 @@ adminRouter.get("/admin/api/logs/stream", (ctx) => {
   const token = ctx.request.url.searchParams.get("token");
   const ADMIN_KEY = Deno.env.get("ADMIN_KEY") || "your-secret-key-change-me";
   
-  console.log(`[SSE] 日志连接请求 - token 验证: ${token === ADMIN_KEY ? '✅' : '❌'}`);
+  logger.info(`[SSE] 日志流连接请求 - 验证: ${token === ADMIN_KEY ? '✅ 通过' : '❌ 失败'}`);
   
   if (token !== ADMIN_KEY) {
     ctx.response.status = 401;
@@ -87,11 +87,11 @@ adminRouter.get("/admin/api/logs/stream", (ctx) => {
   }
 
   const target = ctx.sendEvents();
-  console.log(`[SSE] 日志连接已建立`);
+  logger.info(`[SSE] 日志流已连接`);
   
   // 发送最近的日志
   const recentLogs = getRecentLogs();
-  console.log(`[SSE] 发送历史日志 ${recentLogs.length} 条`);
+  logger.info(`[SSE] 发送历史日志 ${recentLogs.length} 条`);
   recentLogs.forEach((log) => {
     target.dispatchMessage(log);
   });
@@ -101,13 +101,13 @@ adminRouter.get("/admin/api/logs/stream", (ctx) => {
     try {
       target.dispatchMessage(log);
     } catch (e) {
-      console.error(`[SSE] 推送日志失败:`, e);
+      logger.error(`[SSE] 推送日志失败: ${e}`);
     }
   });
 
   // 连接关闭时取消订阅
   target.addEventListener("close", () => {
-    console.log(`[SSE] 日志连接已关闭`);
+    logger.info(`[SSE] 日志流已断开`);
     unsubscribe();
   });
 });
@@ -160,8 +160,10 @@ adminRouter.post("/admin/api/cookies", async (ctx) => {
     }
     
     const newCookie = await addCookie(name, cookie);
+    logger.info(`✅ 添加 Cookie: ${name}`);
     ctx.response.body = newCookie;
   } catch (e) {
+    logger.error(`❌ 添加 Cookie 失败: ${e}`);
     ctx.response.status = 400;
     ctx.response.body = { error: `添加失败: ${e}` };
   }
@@ -183,8 +185,10 @@ adminRouter.put("/admin/api/cookies/:id", async (ctx) => {
       return;
     }
     
+    logger.info(`✏️ 更新 Cookie: ${updated.name} (ID: ${id.slice(0, 8)}...)`);
     ctx.response.body = updated;
   } catch (e) {
+    logger.error(`❌ 更新 Cookie 失败: ${e}`);
     ctx.response.status = 400;
     ctx.response.body = { error: `更新失败: ${e}` };
   }
@@ -195,6 +199,7 @@ adminRouter.put("/admin/api/cookies/:id", async (ctx) => {
  */
 adminRouter.delete("/admin/api/cookies/:id", async (ctx) => {
   const id = ctx.params.id;
+  const cookie = await getCookie(id);
   const success = await deleteCookie(id);
   
   if (!success) {
@@ -203,6 +208,7 @@ adminRouter.delete("/admin/api/cookies/:id", async (ctx) => {
     return;
   }
   
+  logger.info(`🗑️ 删除 Cookie: ${cookie?.name || id.slice(0, 8) + '...'}`);
   ctx.response.body = { success: true };
 });
 
@@ -219,7 +225,15 @@ adminRouter.post("/admin/api/cookies/:id/test", async (ctx) => {
     return;
   }
   
+  logger.info(`🧪 测试 Cookie: ${cookieData.name}`);
   const testResult = await testCookie(cookieData.cookie);
+  
+  if (testResult.valid) {
+    logger.info(`✅ Cookie 有效: ${cookieData.name} (Session: ${testResult.sessionId?.slice(0, 8)}...)`);
+  } else {
+    logger.warn(`❌ Cookie 无效: ${cookieData.name} - ${testResult.error}`);
+  }
+  
   ctx.response.body = testResult;
 });
 

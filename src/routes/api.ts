@@ -11,6 +11,7 @@ import {
   createCompletionResponse,
 } from "../services/chat.ts";
 import { recordRequest, getAvailableCookie, recordCookieUsage } from "../services/cookie.ts";
+import { logger } from "../services/logger.ts";
 
 export const apiRouter = new Router();
 
@@ -39,11 +40,12 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
   if (providedValue.includes("__client") || providedValue.includes("__session")) {
     // 传入的是 Cookie，直接使用
     clerkCookie = providedValue;
-    console.log("使用用户直接提供的 Cookie");
+    logger.info("API 调用 - 使用用户直接提供的 Cookie");
   } else if (providedValue === ADMIN_KEY) {
     // 传入的是 API Key，从 Cookie 池中获取
     const availableCookie = await getAvailableCookie();
     if (!availableCookie) {
+      logger.warn("API 调用失败 - Cookie 池为空");
       ctx.response.status = 503;
       ctx.response.body = { 
         error: "服务暂时不可用", 
@@ -53,7 +55,7 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
     }
     clerkCookie = availableCookie.cookie;
     usedCookieId = availableCookie.id;
-    console.log(`API Key 验证通过，使用 Cookie 池中的 Cookie: ${availableCookie.name} (ID: ${availableCookie.id})`);
+    logger.info(`API 调用 - 使用 Cookie 池: ${availableCookie.name} (ID: ${availableCookie.id.slice(0, 8)}...)`);
   } else {
     // 既不是 Cookie 也不是有效的 API Key
     ctx.response.status = 401;
@@ -95,7 +97,7 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
   }
 
   const fullPrompt = conversationParts.join("\n\n");
-  console.log(`转换后的单轮 prompt 长度: ${fullPrompt.length}`);
+  logger.info(`API 调用 - Prompt 长度: ${fullPrompt.length} 字符`);
 
   if (!fullPrompt.trim()) {
     ctx.response.status = 400;
@@ -108,7 +110,7 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
   try {
     jwtToken = await getJwtFromCookie(clerkCookie);
   } catch (e) {
-    recordRequest(false);
+    await recordRequest(false);
     ctx.response.status = 401;
     ctx.response.body = { error: `${e}` };
     return;
@@ -119,7 +121,7 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
   try {
     userId = extractUserIdFromJwt(jwtToken);
   } catch (e) {
-    recordRequest(false);
+    await recordRequest(false);
     ctx.response.status = 401;
     ctx.response.body = { error: `无效的 JWT: ${e}` };
     return;
@@ -127,12 +129,18 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
 
   // 生成新的聊天历史 ID
   const chatHistoryId = crypto.randomUUID();
-  console.log(`生成新的聊天历史 ID: ${chatHistoryId}`);
+  logger.info(`API 调用 - 新对话: ${chatHistoryId.slice(0, 8)}... | Model: ${model}`);
 
   const requestId = `chatcmpl-${crypto.randomUUID()}`;
 
   if (stream) {
     // 流式响应
+    // 注意：必须在设置 response.body 之前记录，否则响应已发送无法再执行 await
+    await recordRequest(true);
+    if (usedCookieId) {
+      await recordCookieUsage(usedCookieId);
+    }
+    
     ctx.response.headers.set(
       "Content-Type",
       "text/event-stream; charset=utf-8",
@@ -151,11 +159,6 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
     );
 
     ctx.response.body = body;
-    recordRequest(true);
-    // 记录 Cookie 使用
-    if (usedCookieId) {
-      await recordCookieUsage(usedCookieId);
-    }
   } else {
     // 非流式响应
     try {
@@ -172,13 +175,13 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
         model,
         fullContent,
       );
-      recordRequest(true);
+      await recordRequest(true);
       // 记录 Cookie 使用
       if (usedCookieId) {
         await recordCookieUsage(usedCookieId);
       }
     } catch (e) {
-      recordRequest(false);
+      await recordRequest(false);
       ctx.response.status = 500;
       ctx.response.body = { error: `处理请求失败: ${e}` };
     }
