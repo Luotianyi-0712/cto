@@ -17,7 +17,7 @@ import { adminAuthMiddleware } from "../middleware/auth.ts";
 export const adminRouter = new Router();
 
 /**
- * 管理后台登录页面（无需鉴权）
+ * 管理后台登录页面
  */
 adminRouter.get("/admin/login", async (ctx) => {
   try {
@@ -30,11 +30,8 @@ adminRouter.get("/admin/login", async (ctx) => {
   }
 });
 
-// 应用鉴权中间件到所有其他管理后台路由
-adminRouter.use("/admin", adminAuthMiddleware);
-
 /**
- * 管理后台首页（需要鉴权）
+ * 管理后台首页
  */
 adminRouter.get("/admin", async (ctx) => {
   try {
@@ -46,6 +43,9 @@ adminRouter.get("/admin", async (ctx) => {
     ctx.response.body = { error: `无法加载管理后台: ${e}` };
   }
 });
+
+// 应用鉴权中间件到所有 API 路由
+adminRouter.use("/admin/api", adminAuthMiddleware);
 
 /**
  * 获取系统统计
