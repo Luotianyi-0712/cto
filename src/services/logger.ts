@@ -11,9 +11,9 @@ export interface LogEntry {
 // 日志订阅者列表
 const logSubscribers: Set<(log: LogEntry) => void> = new Set();
 
-// 保存最近 100 条日志
+// 保存最近 500 条日志（增加容量，避免重要日志被挤出）
 const recentLogs: LogEntry[] = [];
-const MAX_LOGS = 100;
+const MAX_LOGS = 500;
 
 /**
  * 添加日志

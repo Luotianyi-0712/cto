@@ -190,15 +190,18 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
           yield chunk;
         }
 
-        // 流式响应结束后，注册会话（后台异步执行）
+        // 流式响应结束后，注册会话（使用 await 确保注册成功）
         if (assembledContent.trim()) {
           const messagesWithAssistant = [
             ...messages,
             { role: "assistant", content: assembledContent.trim() },
           ];
-          registerConversation(messagesWithAssistant, model, chatHistoryId).catch((e) => {
-            logger.error(`会话注册失败: ${e}`);
-          });
+          try {
+            await registerConversation(messagesWithAssistant, model, chatHistoryId);
+            logger.info(`✅ 会话已注册 (流式): ${chatHistoryId}`);
+          } catch (e) {
+            logger.error(`❌ 会话注册失败: ${e}`);
+          }
         }
       } catch (error) {
         logger.error(`流式生成器错误: ${error}`);
@@ -235,8 +238,12 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
           ...messages,
           { role: "assistant", content: fullContent.trim() },
         ];
-        await registerConversation(messagesWithAssistant, model, chatHistoryId);
-        logger.info(`会话已注册: ${chatHistoryId}`);
+        try {
+          await registerConversation(messagesWithAssistant, model, chatHistoryId);
+          logger.info(`✅ 会话已注册 (非流式): ${chatHistoryId}`);
+        } catch (e) {
+          logger.error(`❌ 会话注册失败: ${e}`);
+        }
       }
     } catch (e) {
       await recordRequest(false);
