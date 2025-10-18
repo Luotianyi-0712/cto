@@ -21,8 +21,16 @@ app.use(async (ctx, next) => {
   const url = ctx.request.url.pathname;
   const status = ctx.response.status;
   
-  // 过滤掉 SSE 日志流的请求，避免日志污染
-  if (url.includes('/admin/api/logs/stream')) {
+  // 过滤掉不需要记录的请求
+  const filteredPaths = [
+    '/admin/api/logs/stream',    // SSE 日志流
+    '/admin/api/stats',           // 管理后台轮询统计
+    '/admin/api/cookies',         // 管理后台轮询 Cookie
+    '/admin/api/conversations',   // 管理后台轮询会话
+    '/favicon.ico',               // 图标请求
+  ];
+  
+  if (filteredPaths.some(path => url.includes(path))) {
     return;
   }
   
@@ -75,16 +83,16 @@ app.use(apiRouter.allowedMethods());
 console.log(`
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
-║   🚀 CTO.new API 转换器 v${VERSION}                    ║
+║   🚀 CTO.new API 转换器 v${VERSION}                   ║
 ║                                                       ║
-║   📡 服务地址: http://localhost:${PORT}                 ║
-║   🎨 管理后台: http://localhost:${PORT}/admin           ║
-║   📚 API 文档: http://localhost:${PORT}/                ║
+║   📡 服务地址: http://localhost:${PORT}               ║
+║   🎨 管理后台: http://localhost:${PORT}/admin         ║
+║   📚 API 文档: http://localhost:${PORT}/              ║
 ║                                                       ║
-║   ✨ 功能特性:                                         ║
-║      • OpenAI 兼容的聊天接口                          ║
+║   ✨ 功能特性:                                        ║
+║      • OpenAI 兼容的聊天接口                           ║
 ║      • 支持流式和非流式响应                            ║
-║      • Cookie 管理后台                                ║
+║      • Cookie 管理后台                                 ║
 ║      • 实时系统监控                                    ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
