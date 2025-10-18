@@ -16,11 +16,8 @@ import { adminAuthMiddleware } from "../middleware/auth.ts";
 
 export const adminRouter = new Router();
 
-// 应用鉴权中间件到所有管理后台路由
-adminRouter.use("/admin", adminAuthMiddleware);
-
 /**
- * 管理后台登录页面
+ * 管理后台登录页面（无需鉴权）
  */
 adminRouter.get("/admin/login", async (ctx) => {
   try {
@@ -33,8 +30,11 @@ adminRouter.get("/admin/login", async (ctx) => {
   }
 });
 
+// 应用鉴权中间件到所有其他管理后台路由
+adminRouter.use("/admin", adminAuthMiddleware);
+
 /**
- * 管理后台首页
+ * 管理后台首页（需要鉴权）
  */
 adminRouter.get("/admin", async (ctx) => {
   try {

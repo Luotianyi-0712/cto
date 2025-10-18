@@ -26,19 +26,22 @@ export async function adminAuthMiddleware(
   ctx: Context,
   next: () => Promise<unknown>,
 ) {
-  // 如果是管理后台登录页面，允许访问
-  if (ctx.request.url.pathname === "/admin/login") {
-    await next();
-    return;
-  }
-
   // 检查 Authorization header
   if (!verifyAdminAuth(ctx)) {
-    ctx.response.status = 401;
-    ctx.response.body = { 
-      error: "Unauthorized",
-      message: "请提供有效的 Authorization: Bearer <ADMIN_KEY>" 
-    };
+    const pathname = ctx.request.url.pathname;
+    
+    // 如果是 API 请求，返回 401 JSON
+    if (pathname.startsWith("/admin/api/")) {
+      ctx.response.status = 401;
+      ctx.response.body = { 
+        error: "Unauthorized",
+        message: "请提供有效的 Authorization: Bearer <ADMIN_KEY>" 
+      };
+      return;
+    }
+    
+    // 如果是页面请求（如 /admin），重定向到登录页
+    ctx.response.redirect("/admin/login");
     return;
   }
 
