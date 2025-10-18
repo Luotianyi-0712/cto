@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTO.new 管理后台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #333;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #4ade80;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .test-button {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .test-button:hover {
+            background: #555;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            border: 1px solid #e0e0e0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #333;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1f2937;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .stat-icon {
+            font-size: 48px;
+            opacity: 0.2;
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .tabs {
+            background: white;
+            border-radius: 8px;
+            padding: 0;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            overflow: hidden;
+        }
+
+        .tab-buttons {
+            display: flex;
+            border-bottom: 2px solid #f3f4f6;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 16px;
+            background: none;
+            border: none;
+            font-size: 15px;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .tab-button.active {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #333;
+        }
+
+        .tab-content {
+            padding: 24px;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .add-cookie-form {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d0d0d0;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #666;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: monospace;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: #333;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #555;
+        }
+
+        .btn-test {
+            background: #555;
+            color: white;
+        }
+
+        .btn-test:hover {
+            background: #666;
+        }
+
+        .btn-edit {
+            background: #777;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #888;
+        }
+
+        .btn-disable {
+            background: #999;
+            color: white;
+        }
+
+        .btn-disable:hover {
+            background: #aaa;
+        }
+
+        .btn-delete {
+            background: #333;
+            color: white;
+            border: 1px solid #333;
+        }
+
+        .btn-delete:hover {
+            background: white;
+            color: #333;
+        }
+
+        .cookie-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .cookie-item {
+            background: #fafafa;
+            border: 1px solid #d0d0d0;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+
+        .cookie-item:hover {
+            border-color: #999;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .cookie-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .cookie-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .cookie-status {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .cookie-status.active {
+            background: #333;
+            color: white;
+        }
+
+        .cookie-status.inactive {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .cookie-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .cookie-value {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #374151;
+            word-break: break-all;
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .cookie-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .config-section {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .config-section h3 {
+            margin-bottom: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .config-item:last-child {
+            border-bottom: none;
+        }
+
+        .config-label {
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .config-value {
+            color: #666;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .monitor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .monitor-card {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .monitor-card h3 {
+            margin-bottom: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .monitor-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+        }
+
+        .monitor-label {
+            color: #666;
+        }
+
+        .monitor-value {
+            color: #333;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            ⚙️ CTO.new 管理后台
+        </h1>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div class="status-badge">
+                <div class="status-dot"></div>
+                服务运行中
+            </div>
+            <button class="test-button" onclick="testChatAPI()">💬 聊天测试</button>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">总请求数</div>
+            <div class="stat-value" id="totalRequests">0</div>
+            <div class="stat-icon">📊</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">成功请求</div>
+            <div class="stat-value" id="successRequests">0</div>
+            <div class="stat-icon">✅</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">CPU使用率</div>
+            <div class="stat-value" id="cpuUsage">0%</div>
+            <div class="stat-icon">💻</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">内存使用</div>
+            <div class="stat-value" id="memoryUsage">0%</div>
+            <div class="stat-icon">🧠</div>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab-buttons">
+            <button class="tab-button active" onclick="switchTab('cookies')">🍪 Cookie管理</button>
+            <button class="tab-button" onclick="switchTab('schedule')">📅 实时日志</button>
+            <button class="tab-button" onclick="switchTab('config')">⚙️ 系统配置</button>
+            <button class="tab-button" onclick="switchTab('monitor')">📈 系统监控</button>
+        </div>
+
+        <div class="tab-content">
+            <!-- Cookie 管理 -->
+            <div id="tab-cookies" class="tab-pane active">
+                <div class="add-cookie-form">
+                    <h3 style="margin-bottom: 16px; color: #1f2937;">➕ 添加Cookie</h3>
+                    <form onsubmit="addCookie(event)">
+                        <div class="form-group">
+                            <label>主账号</label>
+                            <input type="text" id="cookieName" placeholder="例如: 主账号" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Cookie 值</label>
+                            <textarea id="cookieValue" placeholder="粘贴完整的 Cookie 字符串..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">添加Cookie</button>
+                    </form>
+                </div>
+
+                <div id="cookieList" class="cookie-list">
+                    <!-- Cookie 列表将动态加载 -->
+                </div>
+            </div>
+
+            <!-- 实时日志 -->
+            <div id="tab-schedule" class="tab-pane">
+                <div class="config-section">
+                    <h3>📋 实时日志</h3>
+                    <div style="background: #1f2937; color: #10b981; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto;" id="logContainer">
+                        <div>2025/10/18 01:10:44 [INFO] 服务器启动成功</div>
+                        <div>2025/10/18 01:10:44 [INFO] 监听端口: 8000</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统配置 -->
+            <div id="tab-config" class="tab-pane">
+                <div class="config-section">
+                    <h3>🔧 API 配置</h3>
+                    <div class="config-item">
+                        <div class="config-label">API 基础地址</div>
+                        <div class="config-value">https://api.enginelabs.ai</div>
+                    </div>
+                    <div class="config-item">
+                        <div class="config-label">Clerk 基础地址</div>
+                        <div class="config-value">https://clerk.cto.new</div>
+                    </div>
+                    <div class="config-item">
+                        <div class="config-label">源站地址</div>
+                        <div class="config-value">https://cto.new</div>
+                    </div>
+                    <div class="config-item">
+                        <div class="config-label">服务端口</div>
+                        <div class="config-value">8000</div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>🤖 可用模型</h3>
+                    <div class="config-item">
+                        <div class="config-label">Claude Sonnet 4.5</div>
+                        <div class="config-value">ClaudeSonnet4_5</div>
+                    </div>
+                    <div class="config-item">
+                        <div class="config-label">GPT-5</div>
+                        <div class="config-value">GPT5</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统监控 -->
+            <div id="tab-monitor" class="tab-pane">
+                <div class="monitor-grid">
+                    <div class="monitor-card">
+                        <h3>📊 请求统计</h3>
+                        <div class="monitor-item">
+                            <span class="monitor-label">总请求数</span>
+                            <span class="monitor-value" id="monitorTotalRequests">0</span>
+                        </div>
+                        <div class="monitor-item">
+                            <span class="monitor-label">成功请求</span>
+                            <span class="monitor-value" id="monitorSuccessRequests">0</span>
+                        </div>
+                        <div class="monitor-item">
+                            <span class="monitor-label">成功率</span>
+                            <span class="monitor-value" id="monitorSuccessRate">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="monitor-card">
+                        <h3>🍪 Cookie 状态</h3>
+                        <div class="monitor-item">
+                            <span class="monitor-label">活跃 Cookie</span>
+                            <span class="monitor-value" id="monitorActiveCookies">0</span>
+                        </div>
+                        <div class="monitor-item">
+                            <span class="monitor-label">总 Cookie 数</span>
+                            <span class="monitor-value" id="monitorTotalCookies">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 切换标签页
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        // 加载统计数据
+        async function loadStats() {
+            try {
+                const response = await fetch('/admin/api/stats');
+                const stats = await response.json();
+                
+                document.getElementById('totalRequests').textContent = stats.totalRequests;
+                document.getElementById('successRequests').textContent = stats.successRequests;
+                document.getElementById('cpuUsage').textContent = stats.cpuUsage;
+                document.getElementById('memoryUsage').textContent = stats.memoryUsage;
+                
+                document.getElementById('monitorTotalRequests').textContent = stats.totalRequests;
+                document.getElementById('monitorSuccessRequests').textContent = stats.successRequests;
+                document.getElementById('monitorActiveCookies').textContent = stats.activeCookies;
+                
+                const successRate = stats.totalRequests > 0 
+                    ? ((stats.successRequests / stats.totalRequests) * 100).toFixed(1)
+                    : 0;
+                document.getElementById('monitorSuccessRate').textContent = successRate + '%';
+            } catch (error) {
+                console.error('加载统计数据失败:', error);
+            }
+        }
+
+        // 加载 Cookie 列表
+        async function loadCookies() {
+            try {
+                const response = await fetch('/admin/api/cookies');
+                const cookies = await response.json();
+                
+                const container = document.getElementById('cookieList');
+                document.getElementById('monitorTotalCookies').textContent = cookies.length;
+                
+                if (cookies.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🍪</div>
+                            <h3>暂无 Cookie</h3>
+                            <p>请添加第一个 Cookie 开始使用</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = cookies.map(cookie => `
+                    <div class="cookie-item">
+                        <div class="cookie-header">
+                            <div class="cookie-name">
+                                🏷️ ${cookie.name}
+                                <span class="cookie-status ${cookie.status}">${cookie.status === 'active' ? '启用中' : '已禁用'}</span>
+                            </div>
+                        </div>
+                        <div class="cookie-info">
+                            <div>📅 创建时间: ${new Date(cookie.createdAt).toLocaleString('zh-CN')}</div>
+                            <div>🔢 使用次数: ${cookie.requestCount}</div>
+                            <div>⏰ 最后使用: ${cookie.lastUsed ? new Date(cookie.lastUsed).toLocaleString('zh-CN') : '未使用'}</div>
+                        </div>
+                        <div class="cookie-value">${cookie.cookie.substring(0, 100)}...</div>
+                        <div class="cookie-actions">
+                            <button class="btn btn-test" onclick="testCookie('${cookie.id}')">测试</button>
+                            <button class="btn btn-edit" onclick="editCookie('${cookie.id}')">编辑</button>
+                            <button class="btn btn-disable" onclick="toggleCookie('${cookie.id}', '${cookie.status}')">
+                                ${cookie.status === 'active' ? '禁用' : '启用'}
+                            </button>
+                            <button class="btn btn-delete" onclick="deleteCookie('${cookie.id}')">删除</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载 Cookie 列表失败:', error);
+            }
+        }
+
+        // 添加 Cookie
+        async function addCookie(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('cookieName').value;
+            const cookie = document.getElementById('cookieValue').value;
+            
+            try {
+                const response = await fetch('/admin/api/cookies', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, cookie })
+                });
+                
+                if (response.ok) {
+                    alert('✅ Cookie 添加成功！');
+                    document.getElementById('cookieName').value = '';
+                    document.getElementById('cookieValue').value = '';
+                    loadCookies();
+                    loadStats();
+                } else {
+                    alert('❌ 添加失败，请检查 Cookie 格式');
+                }
+            } catch (error) {
+                alert('❌ 添加失败: ' + error.message);
+            }
+        }
+
+        // 测试 Cookie
+        async function testCookie(id) {
+            try {
+                const response = await fetch(`/admin/api/cookies/${id}/test`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.valid) {
+                    alert('✅ Cookie 有效！');
+                } else {
+                    alert('❌ Cookie 已失效，请更新');
+                }
+            } catch (error) {
+                alert('❌ 测试失败: ' + error.message);
+            }
+        }
+
+        // 切换 Cookie 状态
+        async function toggleCookie(id, currentStatus) {
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            
+            try {
+                const response = await fetch(`/admin/api/cookies/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                
+                if (response.ok) {
+                    loadCookies();
+                    loadStats();
+                }
+            } catch (error) {
+                alert('❌ 操作失败: ' + error.message);
+            }
+        }
+
+        // 删除 Cookie
+        async function deleteCookie(id) {
+            if (!confirm('确定要删除这个 Cookie 吗？')) return;
+            
+            try {
+                const response = await fetch(`/admin/api/cookies/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('✅ 删除成功！');
+                    loadCookies();
+                    loadStats();
+                }
+            } catch (error) {
+                alert('❌ 删除失败: ' + error.message);
+            }
+        }
+
+        // 编辑 Cookie
+        function editCookie(id) {
+            alert('编辑功能开发中...');
+        }
+
+        // 测试聊天 API
+        function testChatAPI() {
+            alert('请使用 API 客户端测试聊天接口\n\nPOST /v1/chat/completions\nAuthorization: Bearer YOUR_COOKIE');
+        }
+
+        // 初始化
+        loadStats();
+        loadCookies();
+        
+        // 定时刷新
+        setInterval(() => {
+            loadStats();
+            loadCookies();
+        }, 5000);
+    </script>
+</body>
+</html>
+
