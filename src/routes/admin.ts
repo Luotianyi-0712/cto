@@ -18,7 +18,7 @@ import { getRecentLogs, subscribeToLogs, type LogEntry } from "../services/logge
 export const adminRouter = new Router();
 
 /**
- * 管理后台登录页面（无需鉴权）
+ * 管理后台登录页面
  */
 adminRouter.get("/admin/login", async (ctx) => {
   try {
@@ -32,7 +32,7 @@ adminRouter.get("/admin/login", async (ctx) => {
 });
 
 /**
- * 管理后台首页（页面本身无需鉴权，由前端 JS 控制，API 需要鉴权）
+ * 管理后台首页
  */
 adminRouter.get("/admin", async (ctx) => {
   try {
@@ -45,7 +45,43 @@ adminRouter.get("/admin", async (ctx) => {
   }
 });
 
-// 应用鉴权中间件到所有 API 路由
+/**
+ * 实时日志推送（Server-Sent Events）
+ */
+adminRouter.get("/admin/api/logs/stream", (ctx) => {
+  // 从 URL 参数获取密钥进行验证
+  const token = ctx.request.url.searchParams.get("token");
+  const ADMIN_KEY = Deno.env.get("ADMIN_KEY") || "your-secret-key-change-me";
+  
+  if (token !== ADMIN_KEY) {
+    ctx.response.status = 401;
+    ctx.response.body = { 
+      error: "Unauthorized",
+      message: "无效的 token 参数" 
+    };
+    return;
+  }
+
+  const target = ctx.sendEvents();
+  
+  // 发送最近的日志
+  const recentLogs = getRecentLogs();
+  recentLogs.forEach((log) => {
+    target.dispatchMessage(log);
+  });
+
+  // 订阅新日志
+  const unsubscribe = subscribeToLogs((log: LogEntry) => {
+    target.dispatchMessage(log);
+  });
+
+  // 连接关闭时取消订阅
+  target.addEventListener("close", () => {
+    unsubscribe();
+  });
+});
+
+// 应用鉴权中间件到所有 API 路由（除了 logs/stream）
 adminRouter.use("/admin/api", adminAuthMiddleware);
 
 /**
@@ -160,30 +196,5 @@ adminRouter.post("/admin/api/cookies/:id/test", async (ctx) => {
  * 验证管理密钥（用于登录页）
  */
 adminRouter.post("/admin/api/verify-key", (ctx) => {
-  // 鉴权中间件会处理实际的密钥验证
-  // 如果能到达这里，说明密钥是有效的
   ctx.response.body = { valid: true, message: "密钥有效" };
-});
-
-/**
- * 实时日志推送（Server-Sent Events）
- */
-adminRouter.get("/admin/api/logs/stream", (ctx) => {
-  const target = ctx.sendEvents();
-  
-  // 发送最近的日志
-  const recentLogs = getRecentLogs();
-  recentLogs.forEach((log) => {
-    target.dispatchMessage(log);
-  });
-
-  // 订阅新日志
-  const unsubscribe = subscribeToLogs((log: LogEntry) => {
-    target.dispatchMessage(log);
-  });
-
-  // 连接关闭时取消订阅
-  target.addEventListener("close", () => {
-    unsubscribe();
-  });
 });

@@ -820,7 +820,8 @@
         // 连接实时日志 SSE
         function connectLogs() {
             const logContainer = document.getElementById('logContainer');
-            const eventSource = new EventSource('/admin/api/logs/stream');
+            // 通过 URL 参数传递密钥
+            const eventSource = new EventSource(`/admin/api/logs/stream?token=${encodeURIComponent(adminKey)}`);
 
             eventSource.onopen = () => {
                 console.log('日志连接已建立');
