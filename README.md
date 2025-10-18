@@ -29,9 +29,9 @@
 2. 登录你的账号
 3. 打开浏览器开发者工具（F12）
 4. 找到 "Cookies" → "https://clerk.cto.new"
-5. 复制 Cookie 值（格式：`_cfuvid=xxxxx`）
-如图
-![image](894d657b4f3d9429cc76c4da466516099e14b0a9.png)
+5. 复制 Cookie 值（格式：`_cfuvid=xxxxx`官方更改了ck格式，以实际为准）
+如图所示，过滤`clerk.cto.new/v1/client/sessions`将cookie直接复制即可
+![image](20251018180109.jpg)
 7. 在管理后台添加 Cookie
 
 ## License
