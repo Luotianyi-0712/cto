@@ -164,7 +164,7 @@
         const savedKey = localStorage.getItem('adminKey');
         if (savedKey) {
             // 自动验证并跳转
-            verifyAndRedirect(savedKey);
+            verifyAndRedirect(savedKey, true);
         }
 
         loginForm.addEventListener('submit', async (e) => {
@@ -176,10 +176,10 @@
                 return;
             }
 
-            await verifyAndRedirect(adminKey);
+            await verifyAndRedirect(adminKey, false);
         });
 
-        async function verifyAndRedirect(adminKey) {
+        async function verifyAndRedirect(adminKey, isAutoLogin = false) {
             try {
                 // 验证密钥
                 const response = await fetch('/admin/api/stats', {
@@ -194,13 +194,27 @@
                     // 跳转到管理后台
                     window.location.href = '/admin';
                 } else if (response.status === 401) {
-                    showError('密钥错误，请重试');
+                    // 清除无效的密钥
                     localStorage.removeItem('adminKey');
+                    
+                    if (isAutoLogin) {
+                        // 自动登录失败，静默处理，不显示错误
+                        console.log('自动登录失败，请手动输入密钥');
+                    } else {
+                        // 手动登录失败，显示错误
+                        showError('密钥错误，请重试');
+                    }
                 } else {
                     showError('验证失败，请稍后重试');
                 }
             } catch (error) {
-                showError('网络错误: ' + error.message);
+                // 清除可能无效的密钥
+                if (isAutoLogin) {
+                    localStorage.removeItem('adminKey');
+                    console.log('自动登录失败:', error.message);
+                } else {
+                    showError('网络错误: ' + error.message);
+                }
             }
         }
 
