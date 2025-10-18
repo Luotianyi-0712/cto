@@ -1,5 +1,8 @@
 # CTONEW
-玩具，支持多轮对话、输出思维链，Oai ChatCompetition 格式
+玩具，支持多轮对话、上下文记忆、输出思维链，
+支持会话ID管理，自动删除对话。
+多账号轮询，使用webui
+使用Oai ChatCompetition 格式
 
 ### Deno Deploy部署
 
