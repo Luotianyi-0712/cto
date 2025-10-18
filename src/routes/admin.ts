@@ -13,7 +13,7 @@ import {
   getSystemStats,
 } from "../services/cookie.ts";
 import { adminAuthMiddleware } from "../middleware/auth.ts";
-import { getRecentLogs, subscribeToLogs, type LogEntry } from "../services/logger.ts";
+import { getRecentLogs, subscribeToLogs, logger, type LogEntry } from "../services/logger.ts";
 
 export const adminRouter = new Router();
 
