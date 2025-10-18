@@ -13,11 +13,12 @@ import {
   getSystemStats,
 } from "../services/cookie.ts";
 import { adminAuthMiddleware } from "../middleware/auth.ts";
+import { getRecentLogs, subscribeToLogs, type LogEntry } from "../services/logger.ts";
 
 export const adminRouter = new Router();
 
 /**
- * 管理后台登录页面
+ * 管理后台登录页面（无需鉴权）
  */
 adminRouter.get("/admin/login", async (ctx) => {
   try {
@@ -31,7 +32,7 @@ adminRouter.get("/admin/login", async (ctx) => {
 });
 
 /**
- * 管理后台首页
+ * 管理后台首页（页面本身无需鉴权，由前端 JS 控制，API 需要鉴权）
  */
 adminRouter.get("/admin", async (ctx) => {
   try {
@@ -50,23 +51,23 @@ adminRouter.use("/admin/api", adminAuthMiddleware);
 /**
  * 获取系统统计
  */
-adminRouter.get("/admin/api/stats", (ctx) => {
-  ctx.response.body = getSystemStats();
+adminRouter.get("/admin/api/stats", async (ctx) => {
+  ctx.response.body = await getSystemStats();
 });
 
 /**
  * 获取所有 Cookie
  */
-adminRouter.get("/admin/api/cookies", (ctx) => {
-  ctx.response.body = getAllCookies();
+adminRouter.get("/admin/api/cookies", async (ctx) => {
+  ctx.response.body = await getAllCookies();
 });
 
 /**
  * 获取单个 Cookie
  */
-adminRouter.get("/admin/api/cookies/:id", (ctx) => {
+adminRouter.get("/admin/api/cookies/:id", async (ctx) => {
   const id = ctx.params.id;
-  const cookie = getCookie(id);
+  const cookie = await getCookie(id);
   
   if (!cookie) {
     ctx.response.status = 404;
@@ -91,7 +92,7 @@ adminRouter.post("/admin/api/cookies", async (ctx) => {
       return;
     }
     
-    const newCookie = addCookie(name, cookie);
+    const newCookie = await addCookie(name, cookie);
     ctx.response.body = newCookie;
   } catch (e) {
     ctx.response.status = 400;
@@ -107,7 +108,7 @@ adminRouter.put("/admin/api/cookies/:id", async (ctx) => {
     const id = ctx.params.id;
     const body = await ctx.request.body({ type: "json" }).value;
     
-    const updated = updateCookie(id, body);
+    const updated = await updateCookie(id, body);
     
     if (!updated) {
       ctx.response.status = 404;
@@ -125,9 +126,9 @@ adminRouter.put("/admin/api/cookies/:id", async (ctx) => {
 /**
  * 删除 Cookie
  */
-adminRouter.delete("/admin/api/cookies/:id", (ctx) => {
+adminRouter.delete("/admin/api/cookies/:id", async (ctx) => {
   const id = ctx.params.id;
-  const success = deleteCookie(id);
+  const success = await deleteCookie(id);
   
   if (!success) {
     ctx.response.status = 404;
@@ -143,7 +144,7 @@ adminRouter.delete("/admin/api/cookies/:id", (ctx) => {
  */
 adminRouter.post("/admin/api/cookies/:id/test", async (ctx) => {
   const id = ctx.params.id;
-  const cookieData = getCookie(id);
+  const cookieData = await getCookie(id);
   
   if (!cookieData) {
     ctx.response.status = 404;
@@ -155,3 +156,34 @@ adminRouter.post("/admin/api/cookies/:id/test", async (ctx) => {
   ctx.response.body = { valid };
 });
 
+/**
+ * 验证管理密钥（用于登录页）
+ */
+adminRouter.post("/admin/api/verify-key", (ctx) => {
+  // 鉴权中间件会处理实际的密钥验证
+  // 如果能到达这里，说明密钥是有效的
+  ctx.response.body = { valid: true, message: "密钥有效" };
+});
+
+/**
+ * 实时日志推送（Server-Sent Events）
+ */
+adminRouter.get("/admin/api/logs/stream", (ctx) => {
+  const target = ctx.sendEvents();
+  
+  // 发送最近的日志
+  const recentLogs = getRecentLogs();
+  recentLogs.forEach((log) => {
+    target.dispatchMessage(log);
+  });
+
+  // 订阅新日志
+  const unsubscribe = subscribeToLogs((log: LogEntry) => {
+    target.dispatchMessage(log);
+  });
+
+  // 连接关闭时取消订阅
+  target.addEventListener("close", () => {
+    unsubscribe();
+  });
+});

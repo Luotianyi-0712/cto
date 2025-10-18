@@ -163,7 +163,7 @@
         // 检查是否已有保存的密钥
         const savedKey = localStorage.getItem('adminKey');
         if (savedKey) {
-            // 自动验证并跳转
+            // 自动验证并跳转（只验证一次，避免无限循环）
             verifyAndRedirect(savedKey, true);
         }
 

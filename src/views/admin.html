@@ -519,9 +519,8 @@
             <div id="tab-schedule" class="tab-pane">
                 <div class="config-section">
                     <h3>📋 实时日志</h3>
-                    <div style="background: #1f2937; color: #10b981; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto;" id="logContainer">
-                        <div>2025/10/18 01:10:44 [INFO] 服务器启动成功</div>
-                        <div>2025/10/18 01:10:44 [INFO] 监听端口: 8000</div>
+                    <div style="background: #1f2937; color: #e5e7eb; padding: 20px; border-radius: 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; max-height: 500px; overflow-y: auto; line-height: 1.6;" id="logContainer">
+                        <div style="color: #9ca3af;">等待日志加载...</div>
                     </div>
                 </div>
             </div>
@@ -817,6 +816,59 @@
             loadStats();
             loadCookies();
         }, 5000);
+
+        // 连接实时日志 SSE
+        function connectLogs() {
+            const logContainer = document.getElementById('logContainer');
+            const eventSource = new EventSource('/admin/api/logs/stream');
+
+            eventSource.onopen = () => {
+                console.log('日志连接已建立');
+                logContainer.innerHTML = '';
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const log = JSON.parse(event.data);
+                    const logLine = document.createElement('div');
+                    logLine.style.marginBottom = '4px';
+                    
+                    // 根据日志级别设置颜色
+                    let color = '#e5e7eb'; // 默认灰白色
+                    if (log.level === 'ERROR') {
+                        color = '#ef4444'; // 红色
+                    } else if (log.level === 'WARN') {
+                        color = '#f59e0b'; // 橙色
+                    } else if (log.level === 'INFO') {
+                        color = '#10b981'; // 绿色
+                    }
+                    
+                    logLine.innerHTML = `<span style="color: #9ca3af;">${log.timestamp}</span> <span style="color: ${color}; font-weight: bold;">[${log.level}]</span> ${log.message}`;
+                    logContainer.appendChild(logLine);
+                    
+                    // 自动滚动到底部
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                    
+                    // 限制日志条数（最多显示 200 条）
+                    while (logContainer.children.length > 200) {
+                        logContainer.removeChild(logContainer.firstChild);
+                    }
+                } catch (e) {
+                    console.error('解析日志失败:', e);
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('日志连接错误:', error);
+                eventSource.close();
+                
+                // 5 秒后重连
+                setTimeout(connectLogs, 5000);
+            };
+        }
+
+        // 启动日志连接
+        connectLogs();
     </script>
 </body>
 </html>

@@ -4,29 +4,37 @@
 
 import type { CookieData, SystemStats } from "../types.ts";
 
-// 内存存储（生产环境可替换为数据库）
-const cookies: Map<string, CookieData> = new Map();
+// 使用 Deno KV 持久化存储
+const kv = await Deno.openKv();
+
+// 统计数据
 let totalRequests = 0;
 let successRequests = 0;
 
 /**
  * 获取所有 Cookie
  */
-export function getAllCookies(): CookieData[] {
-  return Array.from(cookies.values());
+export async function getAllCookies(): Promise<CookieData[]> {
+  const cookies: CookieData[] = [];
+  const entries = kv.list<CookieData>({ prefix: ["cookies"] });
+  for await (const entry of entries) {
+    cookies.push(entry.value);
+  }
+  return cookies;
 }
 
 /**
  * 获取单个 Cookie
  */
-export function getCookie(id: string): CookieData | undefined {
-  return cookies.get(id);
+export async function getCookie(id: string): Promise<CookieData | null> {
+  const result = await kv.get<CookieData>(["cookies", id]);
+  return result.value;
 }
 
 /**
  * 添加 Cookie
  */
-export function addCookie(name: string, cookie: string): CookieData {
+export async function addCookie(name: string, cookie: string): Promise<CookieData> {
   const id = crypto.randomUUID();
   const cookieData: CookieData = {
     id,
@@ -36,30 +44,31 @@ export function addCookie(name: string, cookie: string): CookieData {
     createdAt: new Date().toISOString(),
     requestCount: 0,
   };
-  cookies.set(id, cookieData);
+  await kv.set(["cookies", id], cookieData);
   return cookieData;
 }
 
 /**
  * 更新 Cookie
  */
-export function updateCookie(
+export async function updateCookie(
   id: string,
   updates: Partial<CookieData>,
-): CookieData | null {
-  const cookie = cookies.get(id);
+): Promise<CookieData | null> {
+  const cookie = await getCookie(id);
   if (!cookie) return null;
 
   const updated = { ...cookie, ...updates };
-  cookies.set(id, updated);
+  await kv.set(["cookies", id], updated);
   return updated;
 }
 
 /**
  * 删除 Cookie
  */
-export function deleteCookie(id: string): boolean {
-  return cookies.delete(id);
+export async function deleteCookie(id: string): Promise<boolean> {
+  await kv.delete(["cookies", id]);
+  return true;
 }
 
 /**
@@ -82,10 +91,9 @@ export async function testCookie(cookie: string): Promise<boolean> {
 /**
  * 获取可用的 Cookie（轮询）
  */
-export function getAvailableCookie(): CookieData | null {
-  const activeCookies = Array.from(cookies.values()).filter(
-    (c) => c.status === "active",
-  );
+export async function getAvailableCookie(): Promise<CookieData | null> {
+  const allCookies = await getAllCookies();
+  const activeCookies = allCookies.filter((c) => c.status === "active");
   if (activeCookies.length === 0) return null;
 
   // 简单轮询：返回使用次数最少的
@@ -96,12 +104,12 @@ export function getAvailableCookie(): CookieData | null {
 /**
  * 记录 Cookie 使用
  */
-export function recordCookieUsage(id: string): void {
-  const cookie = cookies.get(id);
+export async function recordCookieUsage(id: string): Promise<void> {
+  const cookie = await getCookie(id);
   if (cookie) {
     cookie.requestCount++;
     cookie.lastUsed = new Date().toISOString();
-    cookies.set(id, cookie);
+    await kv.set(["cookies", id], cookie);
   }
 }
 
@@ -116,10 +124,9 @@ export function recordRequest(success: boolean): void {
 /**
  * 获取系统统计
  */
-export function getSystemStats(): SystemStats {
-  const activeCookies = Array.from(cookies.values()).filter(
-    (c) => c.status === "active",
-  ).length;
+export async function getSystemStats(): Promise<SystemStats> {
+  const allCookies = await getAllCookies();
+  const activeCookies = allCookies.filter((c) => c.status === "active").length;
 
   return {
     totalRequests,
