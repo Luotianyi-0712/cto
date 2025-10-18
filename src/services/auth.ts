@@ -4,6 +4,7 @@
 
 import { decode as jwtDecode } from "djwt";
 import { CLERK_BASE, ORIGIN } from "../config.ts";
+import { logger } from "./logger.ts";
 
 /**
  * 从 cookie 中提取 session ID
@@ -20,10 +21,10 @@ export async function extractSessionFromCookie(
       if (
         payload && typeof payload === "object" && "rotating_token" in payload
       ) {
-        console.log("从 __client 中提取到 rotating_token");
+        logger.info("🔑 从 __client 中提取到 rotating_token");
       }
     } catch (e) {
-      console.warn(`解析 __client JWT 失败: ${e}`);
+      logger.warn(`⚠️ 解析 __client JWT 失败: ${e}`);
     }
   }
 
@@ -41,12 +42,12 @@ export async function extractSessionFromCookie(
       const sessions = data?.response?.sessions || [];
       if (sessions.length > 0) {
         const sessionId = sessions[0].id;
-        console.log(`获取到 session_id: ${sessionId}`);
+        logger.info(`✅ 获取到 session_id: ${sessionId}`);
         return sessionId;
       }
     }
   } catch (e) {
-    console.error(`获取 session 失败: ${e}`);
+    logger.error(`❌ 获取 session 失败: ${e}`);
   }
 
   return null;
@@ -85,10 +86,10 @@ export async function getJwtFromCookie(cookie: string): Promise<string> {
     if (!jwtToken) {
       throw new Error("响应中缺少 jwt 字段");
     }
-    console.log("成功获取 JWT token");
+    logger.info("🎫 成功获取 JWT token");
     return jwtToken;
   } catch (e) {
-    console.error(`获取 JWT 失败: ${e}`);
+    logger.error(`❌ 获取 JWT 失败: ${e}`);
     throw new Error(`无法获取 JWT token: ${e}`);
   }
 }

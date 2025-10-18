@@ -4,6 +4,7 @@
 
 import { BASE_URL, ORIGIN } from "../config.ts";
 import type { SSEChunk } from "../types.ts";
+import { logger } from "./logger.ts";
 
 /**
  * 创建 SSE 格式的响应块
@@ -142,7 +143,7 @@ export async function* streamChatGenerator(
     // 等待连接打开
     await new Promise<void>((resolve, reject) => {
       ws.onopen = () => {
-        console.log(`WebSocket 已连接: ${chatHistoryId}`);
+        logger.info(`🔌 WebSocket 已连接: ${chatHistoryId}`);
         resolve();
       };
       ws.onerror = (e) => reject(e);
@@ -309,7 +310,7 @@ export async function nonStreamChat(
     // 等待连接打开
     await new Promise<void>((resolve, reject) => {
       ws.onopen = () => {
-        console.log(`WebSocket 已连接 (非流式): ${chatHistoryId}`);
+        logger.info(`🔌 WebSocket 已连接 (非流式): ${chatHistoryId}`);
         resolve();
       };
       ws.onerror = (e) => reject(e);

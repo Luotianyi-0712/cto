@@ -132,8 +132,19 @@ export async function registerConversation(
     lastUpdated: Date.now(),
   };
 
-  // 保存到 KV，设置过期时间（秒）
+  // 1. 保存查找索引（historyKey -> chatHistoryId）
   await kv.set(kvKey, state, {
+    expireIn: CONVERSATION_TTL_MS,
+  });
+
+  // 2. 保存会话详情（chatHistoryId -> ConversationState）
+  // 用于列表显示，不会被相同历史的会话覆盖
+  const detailKey = ["conversations", "by-id", chatHistoryId];
+  const detailState: ConversationState & { historyKey: string } = {
+    ...state,
+    historyKey, // 保存历史键，用于删除时清理索引
+  };
+  await kv.set(detailKey, detailState, {
     expireIn: CONVERSATION_TTL_MS,
   });
 }
@@ -163,7 +174,8 @@ export async function getConversationStats(): Promise<{
   let active = 0;
   const now = Date.now();
 
-  const entries = kv.list<ConversationState>({ prefix: ["conversations"] });
+  // 从 by-id 索引统计，避免重复计数
+  const entries = kv.list<ConversationState>({ prefix: ["conversations", "by-id"] });
 
   for await (const entry of entries) {
     total++;
@@ -202,11 +214,18 @@ export async function deleteConversation(
       };
     }
 
-    // 2. 从 KV 中删除会话记录
-    const entries = kv.list<ConversationState>({ prefix: ["conversations"] });
-    for await (const entry of entries) {
-      if (entry.value.chatHistoryId === chatHistoryId) {
-        await kv.delete(entry.key);
+    // 2. 从 KV 中删除会话记录（包括 by-id 索引和 historyKey 索引）
+    const detailKey = ["conversations", "by-id", chatHistoryId];
+    const detailResult = await kv.get<ConversationState & { historyKey: string }>(detailKey);
+    
+    if (detailResult.value) {
+      // 删除 by-id 索引
+      await kv.delete(detailKey);
+      
+      // 删除 historyKey 索引（如果存在）
+      if (detailResult.value.historyKey) {
+        const historyIndexKey = getKvKey(detailResult.value.historyKey);
+        await kv.delete(historyIndexKey);
       }
     }
 
@@ -244,7 +263,8 @@ export async function getAllConversations(): Promise<Array<{
     lastUpdated: string;
   }> = [];
 
-  const entries = kv.list<ConversationState>({ prefix: ["conversations"] });
+  // 从 by-id 索引读取，避免被相同历史的会话覆盖
+  const entries = kv.list<ConversationState>({ prefix: ["conversations", "by-id"] });
 
   for await (const entry of entries) {
     conversations.push({
