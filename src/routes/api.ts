@@ -87,18 +87,6 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
     return;
   }
 
-  // 获取最后一条用户消息（会话保持模式下，只需要发送当前问题）
-  const lastUserMessage = [...messages].reverse().find(msg => msg.role === "user");
-  
-  if (!lastUserMessage || !lastUserMessage.content) {
-    ctx.response.status = 400;
-    ctx.response.body = { error: "未找到有效的用户消息" };
-    return;
-  }
-
-  const prompt = lastUserMessage.content;
-  logger.info(`API 调用 - 用户问题: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`);
-
   // 获取 JWT token
   let jwtToken: string;
   try {
@@ -125,10 +113,38 @@ apiRouter.post("/v1/chat/completions", async (ctx) => {
   const existingChatHistoryId = await findExistingConversation(messages, model);
   const chatHistoryId = existingChatHistoryId || crypto.randomUUID();
   
+  // 根据是否是新会话决定 prompt 处理方式
+  let prompt: string;
+  
   if (existingChatHistoryId) {
-    logger.info(`API 调用 - 复用会话: ${chatHistoryId} | Model: ${model}`);
+    // 复用会话：只发送最后一条用户消息（cto.new 会自动加载历史上下文）
+    const lastUserMessage = [...messages].reverse().find(msg => msg.role === "user");
+    if (!lastUserMessage || !lastUserMessage.content) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "未找到有效的用户消息" };
+      return;
+    }
+    prompt = lastUserMessage.content;
+    logger.info(`API 调用 - 复用会话: ${chatHistoryId} | Model: ${model} | 问题: ${prompt.substring(0, 50)}...`);
   } else {
-    logger.info(`API 调用 - 新对话: ${chatHistoryId} | Model: ${model}`);
+    // 新会话：合并所有消息（第一次对话，需要完整上下文）
+    const conversationParts: string[] = [];
+    for (const msg of messages) {
+      const role = msg.role || "unknown";
+      const content = msg.content || "";
+      if (content) {
+        conversationParts.push(`${role}:\n${content}\n`);
+      }
+    }
+    prompt = conversationParts.join("\n");
+    
+    if (!prompt.trim()) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "消息内容为空" };
+      return;
+    }
+    
+    logger.info(`API 调用 - 新对话: ${chatHistoryId} | Model: ${model} | 消息数: ${messages.length}`);
   }
 
   const requestId = `chatcmpl-${crypto.randomUUID()}`;

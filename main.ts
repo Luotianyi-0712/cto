@@ -7,6 +7,7 @@ import { Application } from "oak";
 import { apiRouter } from "./src/routes/api.ts";
 import { adminRouter } from "./src/routes/admin.ts";
 import { PORT, VERSION } from "./src/config.ts";
+import { logger } from "./src/services/logger.ts";
 
 // 创建应用
 const app = new Application();
@@ -16,7 +17,21 @@ app.use(async (ctx, next) => {
   const start = Date.now();
   await next();
   const ms = Date.now() - start;
-  console.log(`${ctx.request.method} ${ctx.request.url} - ${ms}ms`);
+  const method = ctx.request.method;
+  const url = ctx.request.url.pathname;
+  const status = ctx.response.status;
+  
+  // 过滤掉 SSE 日志流的请求，避免日志污染
+  if (url.includes('/admin/api/logs/stream')) {
+    return;
+  }
+  
+  // 使用日志服务记录
+  if (status >= 400) {
+    logger.error(`${method} ${url} - ${status} (${ms}ms)`);
+  } else {
+    logger.info(`${method} ${url} - ${status} (${ms}ms)`);
+  }
 });
 
 // 错误处理中间件
@@ -24,7 +39,7 @@ app.use(async (ctx, next) => {
   try {
     await next();
   } catch (err) {
-    console.error("错误:", err);
+    logger.error(`请求错误: ${err}`);
     ctx.response.status = 500;
     ctx.response.body = { error: "Internal Server Error" };
   }
@@ -74,6 +89,11 @@ console.log(`
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
 `);
+
+logger.info(`🚀 服务器启动成功，监听端口 ${PORT}`);
+logger.info(`🎨 管理后台: http://localhost:${PORT}/admin/login`);
+logger.info(`✅ 实时日志系统已启动`);
+logger.info(`📡 等待 API 请求...`);
 
 await app.listen({ port: PORT });
 

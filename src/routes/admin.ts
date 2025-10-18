@@ -77,8 +77,6 @@ adminRouter.get("/admin/api/logs/stream", (ctx) => {
   const token = ctx.request.url.searchParams.get("token");
   const ADMIN_KEY = Deno.env.get("ADMIN_KEY") || "your-secret-key-change-me";
   
-  logger.info(`[SSE] 日志流连接请求 - 验证: ${token === ADMIN_KEY ? '✅ 通过' : '❌ 失败'}`);
-  
   if (token !== ADMIN_KEY) {
     ctx.response.status = 401;
     ctx.response.body = { 
@@ -89,27 +87,47 @@ adminRouter.get("/admin/api/logs/stream", (ctx) => {
   }
 
   const target = ctx.sendEvents();
-  logger.info(`[SSE] 日志流已连接`);
   
-  // 发送最近的日志
+  let isConnected = true;
+  
+  // 发送最近的日志（不记录 SSE 自身的连接日志，避免污染）
   const recentLogs = getRecentLogs();
-  logger.info(`[SSE] 发送历史日志 ${recentLogs.length} 条`);
-  recentLogs.forEach((log) => {
-    target.dispatchMessage(log);
-  });
+  
+  try {
+    recentLogs.forEach((log) => {
+      if (isConnected) {
+        target.dispatchMessage(log);
+      }
+    });
+  } catch (e) {
+    // 不记录日志，避免污染
+    isConnected = false;
+  }
 
   // 订阅新日志
   const unsubscribe = subscribeToLogs((log: LogEntry) => {
+    if (!isConnected) {
+      return; // 已断开，不再推送
+    }
+    
     try {
       target.dispatchMessage(log);
     } catch (e) {
-      logger.error(`[SSE] 推送日志失败: ${e}`);
+      // 推送失败，标记为断开并取消订阅
+      if (!isConnected) return; // 防止重复处理
+      
+      // 不记录日志，避免污染
+      isConnected = false;
+      unsubscribe();
     }
   });
 
   // 连接关闭时取消订阅
   target.addEventListener("close", () => {
-    logger.info(`[SSE] 日志流已断开`);
+    if (!isConnected) return; // 已经处理过
+    
+    // 不记录日志，避免污染
+    isConnected = false;
     unsubscribe();
   });
 });
