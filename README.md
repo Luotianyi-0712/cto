@@ -5,8 +5,13 @@
 使用Oai ChatCompetition 格式
 
 ### Deno Deploy部署
+Fork本仓库，点个star
+
+点击depley
 
 [![Deploy to Deno](https://deno.com/deploy.svg)](https://dash.deno.com/new_project)
+
+选择你的GitHub仓库
 
 设置入口文件为 `main.ts`
 ### 环境变量
